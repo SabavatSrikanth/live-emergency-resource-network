@@ -5,6 +5,8 @@
 ![LERN Platform](https://img.shields.io/badge/Status-Live%20%26%20Operational-emerald?style=for-the-badge)
 ![Tech Stack](https://img.shields.io/badge/Stack-React%20%7C%20Node.js%20%7C%20Express%20%7C%20Socket.IO%20%7C%20Leaflet-blue?style=for-the-badge)
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSabavatSrikanth%2Flive-emergency-resource-network&root-directory=client)
+
 ---
 
 ## 🌟 Key Features
