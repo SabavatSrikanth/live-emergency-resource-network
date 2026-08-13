@@ -1,0 +1,19 @@
+{
+  "name": "lern",
+  "version": "1.0.0",
+  "description": "Live Emergency Resource Network",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "server": "npm run dev --workspace=server",
+    "client": "npm run dev --workspace=client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
