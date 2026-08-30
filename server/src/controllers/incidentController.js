@@ -71,26 +71,50 @@ exports.createIncident = async (req, res) => {
       return res.status(400).json({ error: 'Title and description are required.' });
     }
 
-    const lat = (typeof location === 'object' && location?.coordinates?.lat) ? Number(location.coordinates.lat) : (40.7128 + (Math.random() - 0.5) * 0.04);
-    const lng = (typeof location === 'object' && location?.coordinates?.lng) ? Number(location.coordinates.lng) : (-74.0060 + (Math.random() - 0.5) * 0.04);
+    let lat = (typeof location === 'object' && location?.coordinates?.lat) ? Number(location.coordinates.lat) : null;
+    let lng = (typeof location === 'object' && location?.coordinates?.lng) ? Number(location.coordinates.lng) : null;
 
-    // Dynamic AI triage plan generator
-    const recommendedResources = category === 'Fire' ? [{ type: 'Fire Tenders', qty: 2 }, { type: 'Ambulances', qty: 1 }]
-      : category === 'Medical' ? [{ type: 'Ambulances', qty: 1 }, { type: 'Hospital Beds', qty: 1 }]
-      : category === 'Flood' ? [{ type: 'Rescue Squads', qty: 2 }]
-      : [{ type: 'Rescue Squads', qty: 1 }];
+    // Real-world OpenStreetMap Nominatim Geocoding lookup using native fetch
+    if ((!lat || !lng) && addressStr && addressStr.trim() !== '') {
+      try {
+        const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressStr)}&format=json&limit=1`;
+        const geoRes = await fetch(geoUrl, {
+          headers: { 'User-Agent': 'LERN-Crisis-App/1.0 (emergency-dispatch)' }
+        });
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          if (geoData && geoData.length > 0) {
+            lat = Number(geoData[0].lat);
+            lng = Number(geoData[0].lon);
+            logger.info(`Geocoded "${addressStr}" -> Lat: ${lat}, Lng: ${lng}`);
+          }
+        }
+      } catch (geoErr) {
+        logger.warn(`Geocoding error for "${addressStr}": ${geoErr.message}`);
+      }
+    }
 
-    const aiTriagePlan = {
-      status: 'PROPOSED',
-      summary: `Automated LERN AI Plan: Deploy ${recommendedResources.map(r => `${r.qty} ${r.type}`).join(' & ')} to ${addressStr}.`,
-      confidenceScore: Math.floor(Math.random() * 10) + 90,
-      recommendedActions: [
-        `Dispatch closest response team to ${addressStr}.`,
-        `Notify nearby responders within 5km radius.`,
-        `Pre-reserve capacity at closest emergency depot.`
-      ],
-      recommendedResources
-    };
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+      lat = 40.7128 + (Math.random() - 0.5) * 0.04;
+      lng = -74.0060 + (Math.random() - 0.5) * 0.04;
+    }
+
+    let aiTriagePlan;
+    try {
+      const agentService = require('../services/agentService');
+      aiTriagePlan = await agentService.generateTriagePlan({
+        title, category: category || 'Other', priority: priority || 'MEDIUM', description, location: { address: addressStr }
+      });
+    } catch (err) {
+      logger.warn(`AI Triage failed, falling back to basic plan: ${err.message}`);
+      aiTriagePlan = {
+        status: 'PROPOSED',
+        summary: `Basic Plan: Dispatch closest units to ${addressStr}.`,
+        confidenceScore: 50,
+        recommendedActions: [`Dispatch closest response team to ${addressStr}.`],
+        recommendedResources: []
+      };
+    }
 
     const incidentData = {
       title,
@@ -239,6 +263,23 @@ exports.deployAiDispatchPlan = async (req, res) => {
         timestamp: new Date()
       });
       updatedIncident = await incident.save();
+
+      // Automatically allocate and decrement live resources from the database
+      const Resource = require('../models/Resource');
+      
+      // Dispatch 1 Ambulance
+      await Resource.findOneAndUpdate(
+        { type: 'Ambulances', available: { $gt: 0 } },
+        { $inc: { available: -1 } }
+      ).catch(() => {});
+
+      // For High/Critical, reserve 1 ICU Bed
+      if (incident.priority === 'CRITICAL' || incident.priority === 'HIGH') {
+        await Resource.findOneAndUpdate(
+          { type: 'Hospital Beds', available: { $gt: 0 } },
+          { $inc: { available: -1 } }
+        ).catch(() => {});
+      }
     } else {
       updatedIncident = seedData.updateIncident(id, {
         status: updatedStatus,
@@ -251,16 +292,26 @@ exports.deployAiDispatchPlan = async (req, res) => {
       });
     }
 
-    // Broadcast update
+    // Broadcast update to all clients and post to Volunteer Broadcast channel
+    const Message = require('../models/Message');
+    const triageSummary = updatedIncident.aiTriagePlan?.summary || 'Standard Rescue Kit (Food, Water, First-Aid) required.';
+    const volunteerAlertMsg = {
+      channel: 'volunteer-broadcast',
+      sender: { name: 'LERN Command AI', role: 'AI Assistant', isAI: true },
+      text: `🚨 EMERGENCY DISPATCHED: "${updatedIncident.title}" at ${updatedIncident.location?.address || 'Field Location'}. Priority: ${updatedIncident.priority}.\n\n📋 **Required Supplies**: ${triageSummary}\n\nVolunteer squads and rescue teams requested!`,
+      createdAt: new Date().toISOString()
+    };
+
+    if (isDbConnected()) {
+      await Message.create(volunteerAlertMsg).catch(() => {});
+    } else {
+      seedData.addMessage({ _id: 'msg-' + Date.now(), ...volunteerAlertMsg });
+    }
+
     const io = req.app.get('socketio');
     if (io) {
       io.emit('incident:updated', updatedIncident);
-      io.emit('chat:broadcast', {
-        channel: 'ai-dispatch',
-        sender: { name: 'LERN Command AI', role: 'AI Assistant', isAI: true },
-        text: `🚨 AI Dispatch Plan Deployed for Incident "${updatedIncident.title}". Emergency units notified.`,
-        createdAt: new Date().toISOString()
-      });
+      io.emit('chat:message', volunteerAlertMsg);
     }
 
     return res.json({ success: true, message: 'AI Dispatch Plan Deployed Successfully', data: updatedIncident });

@@ -108,7 +108,10 @@ export default function RootLayout() {
             </span>
           </div>
           <div className="flex items-center space-x-4">
-            <button className="text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-xl transition-all shadow-md shadow-brand-500/10 flex items-center space-x-2">
+            <button 
+              onClick={() => navigate('/reports')}
+              className="text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-xl transition-all shadow-md shadow-brand-500/10 flex items-center space-x-2"
+            >
               <ShieldAlert className="w-4 h-4" />
               <span>Report Emergency</span>
             </button>

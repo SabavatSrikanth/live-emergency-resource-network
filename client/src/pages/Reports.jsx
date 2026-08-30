@@ -14,9 +14,11 @@ import {
   Zap
 } from 'lucide-react';
 import useIncidentStore from '../store/useIncidentStore';
+import useAuthStore from '../store/useAuthStore';
 
 export default function Reports() {
   const { incidents, fetchIncidents, createIncident, updateIncidentStatus, deployAiPlan, initSocketListeners } = useIncidentStore();
+  const { user } = useAuthStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterPriority, setFilterPriority] = useState('ALL');
@@ -46,11 +48,7 @@ export default function Reports() {
         priority,
         description,
         location: {
-          address,
-          coordinates: {
-            lat: 40.7128 + (Math.random() - 0.5) * 0.04,
-            lng: -74.0060 + (Math.random() - 0.5) * 0.04
-          }
+          address
         }
       });
       setIsModalOpen(false);
@@ -186,7 +184,16 @@ export default function Reports() {
                       )}
                     </td>
                     <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
-                      {item.status !== 'RESOLVED' && (
+                      {item.status === 'DISPATCHED' && user?.role !== 'Citizen' && (
+                        <button
+                          onClick={() => updateIncidentStatus(item._id || item.id, 'RESPONDING')}
+                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-sm"
+                          title="Mark Volunteers En Route"
+                        >
+                          🚑 En Route (Responders)
+                        </button>
+                      )}
+                      {item.status !== 'RESOLVED' && user?.role === 'Dispatcher' && (
                         <button
                           onClick={() => updateIncidentStatus(item._id || item.id, 'RESOLVED')}
                           className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 hover:bg-emerald-100 rounded-lg text-[10px] font-bold transition-colors"
@@ -194,7 +201,7 @@ export default function Reports() {
                           Resolve
                         </button>
                       )}
-                      {item.aiTriagePlan && item.aiTriagePlan.status !== 'DEPLOYED' && (
+                      {item.aiTriagePlan && item.aiTriagePlan.status !== 'DEPLOYED' && user?.role === 'Dispatcher' && (
                         <button
                           onClick={() => deployAiPlan(item._id || item.id)}
                           className="px-2.5 py-1 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-sm"

@@ -16,10 +16,11 @@
 - **Geospatial Radius Query**: Filter incidents and resources dynamically within 5km, 10km, 25km, or 50km radii.
 - **Interactive "Report on Map" Mode**: Click anywhere on the map grid to set a pin at exact latitude/longitude coordinates and file an incident report on the spot.
 
-### 🤖 2. LERN Command Agent & AI Dispatcher
-- **Automated Triage Generation**: Calculates required response units (Ambulances, Fire Tenders, Rescue Squads, ICU beds) upon incident creation.
-- **One-Click Protocol Deployment**: Command Dispatchers can review AI-proposed action plans and deploy them instantly across field units.
-- **Real-Time AI Chat Assistant**: Query the AI in natural language to get live hospital bed counts, active incident tallies, and responder statuses.
+### 🤖 2. LERN Command Agent & AI Dispatcher (Agentic AI)
+- **Agentic Workflows**: Powered by **LangChain** and **Google Generative AI**, the LERN Command Agent dynamically calls tools to read real-time database state and formulate decisions.
+- **Automated Triage Generation**: When an incident is created, the Agent uses tools to scan available resources (Ambulances, Fire Tenders, Rescue Squads, ICU beds) and strictly recommends deployments based on live capacity.
+- **Human-in-the-Loop Protocol**: Command Dispatchers review the AI-proposed action plans and must explicitly approve them before deploying instantly across field units.
+- **Agentic AI Chat Assistant**: The dispatcher chatbot is equipped with conversational memory and tools. Query the Agent in natural language to dynamically get live hospital bed counts, active incident tallies, and responder statuses directly from the database.
 
 ### ⚡ 3. Socket.IO Real-Time Synchronization
 - **Zero-Latency Feeds**: Live WebSocket broadcasting for newly filed reports, status updates (`VERIFYING` ➔ `DISPATCHED` ➔ `RESOLVED`), and emergency broadcasts.

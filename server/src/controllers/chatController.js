@@ -74,40 +74,15 @@ exports.sendMessage = async (req, res) => {
     // Auto-generate AI Response if channel is 'ai-dispatch'
     let aiResponseMsg = null;
     if (channel === 'ai-dispatch') {
-      const Resource = require('../models/Resource');
-      let activeIncidentsCount = 0;
-      let totalIncidentsCount = 0;
-      let availableBedsCount = 0;
-
-      if (isDbConnected()) {
-        const Incident = require('../models/Incident');
-        activeIncidentsCount = await Incident.countDocuments({ status: { $ne: 'RESOLVED' } });
-        totalIncidentsCount = await Incident.countDocuments({});
-        const resources = await Resource.find({ type: 'Hospital Beds' });
-        availableBedsCount = resources.reduce((acc, r) => acc + (r.available || 0), 0);
-      } else {
-        const incidents = seedData.getIncidents();
-        activeIncidentsCount = incidents.filter(i => i.status !== 'RESOLVED').length;
-        totalIncidentsCount = incidents.length;
-        const resources = seedData.getResources().filter(r => r.type === 'Hospital Beds');
-        availableBedsCount = resources.reduce((acc, r) => acc + (r.available || 0), 0);
-      }
-
-      let aiText = `I have logged your dispatch query into the crisis management database. Currently tracking ${activeIncidentsCount} active emergency reports and ${availableBedsCount} available hospital beds.`;
-      const queryLower = text.toLowerCase();
+      const agentService = require('../services/agentService');
+      const sessionId = sender?.name || req.user?.name || 'default_session';
       
-      if (queryLower.includes('fire') || queryLower.includes('burn')) {
-        aiText = `⚠️ Fire emergency protocol checked. Active emergencies remaining: ${activeIncidentsCount}. 2 engines at Station #7 ready for deployment.`;
-      } else if (queryLower.includes('bed') || queryLower.includes('hospital') || queryLower.includes('icu')) {
-        aiText = `🏥 Real-time Hospital Capacity: ${availableBedsCount} ICU/trauma beds currently available across facilities. EMS units on standby.`;
-      } else if (queryLower.includes('flood') || queryLower.includes('water') || queryLower.includes('boat')) {
-        aiText = `🌊 Aquatic flood protocol active. ${activeIncidentsCount} active reports being monitored by field rescue squads.`;
-      } else if (queryLower.includes('status') || queryLower.includes('report') || queryLower.includes('summary') || queryLower.includes('active') || queryLower.includes('any')) {
-        if (activeIncidentsCount === 0) {
-          aiText = `✅ LERN System Status: All emergency incident reports have been RESOLVED! Currently 0 active emergencies. 142 On-Duty Volunteers and ${availableBedsCount} Hospital Beds on standby.`;
-        } else {
-          aiText = `📊 Live LERN System Status: ${activeIncidentsCount} Active Emergency Report(s) remaining (${totalIncidentsCount - activeIncidentsCount} resolved today). ${availableBedsCount} Hospital Beds available across 4 facilities.`;
-        }
+      let aiText;
+      try {
+        aiText = await agentService.handleAgenticChat(sessionId, text);
+      } catch(err) {
+        logger.error(`Agentic chat failed: ${err.message}`);
+        aiText = `Error connecting to LERN Command AI: ${err.message}`;
       }
 
       const aiMsgData = {

@@ -125,7 +125,29 @@ const login = async (req, res, next) => {
     logger.debug(`Login request. Database active: ${dbActive}`);
 
     if (dbActive) {
-      const user = await User.findOne({ email });
+      let user = await User.findOne({ email });
+
+      // Auto-create demo preset account if DB is active but unseeded
+      if (!user) {
+        const demoPresets = {
+          'dispatcher@lern.org': { name: 'Dispatcher Dave', role: 'Dispatcher' },
+          'hospital@lern.org': { name: 'Hospital Admin Sarah', role: 'Hospital Admin' },
+          'volunteer@lern.org': { name: 'Volunteer Alex', role: 'Volunteer' },
+          'citizen@lern.org': { name: 'Citizen Jane', role: 'Citizen' },
+        };
+        const lowerEmail = (email || '').toLowerCase();
+        if (demoPresets[lowerEmail]) {
+          const preset = demoPresets[lowerEmail];
+          user = new User({
+            name: preset.name,
+            email: lowerEmail,
+            password: password || 'password123',
+            role: preset.role
+          });
+          await user.save();
+        }
+      }
+
       if (!user || !(await user.comparePassword(password))) {
         return res.status(401).json({ error: 'Invalid email or password.' });
       }

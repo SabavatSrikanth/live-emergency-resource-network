@@ -26,6 +26,16 @@ app.use('/api/incidents', require('./routes/incidentRoutes'));
 app.use('/api/resources', require('./routes/resourceRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 
+// Root API status endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    name: 'Live Emergency Resource Network (LERN) API',
+    status: 'Operational',
+    health: '/api/health',
+    endpoints: ['/api/incidents', '/api/resources', '/api/chat', '/api/auth']
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({

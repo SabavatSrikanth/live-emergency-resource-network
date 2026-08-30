@@ -62,6 +62,26 @@ function MapClickListener({ onMapClick, isAddingReport }) {
   return null;
 }
 
+// Auto-adjust map center when new incidents are filed
+function MapBoundsAdjuster({ incidents, setCenter }) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    if (incidents && incidents.length > 0) {
+      const validIncidents = incidents.filter(i => i.location?.coordinates?.lat && i.location?.coordinates?.lng);
+      if (validIncidents.length > 0) {
+        const latestInc = validIncidents[0];
+        const lat = Number(latestInc.location.coordinates.lat);
+        const lng = Number(latestInc.location.coordinates.lng);
+        if (lat && lng) {
+          map.setView([lat, lng], 10);
+          if (setCenter) setCenter([lat, lng]);
+        }
+      }
+    }
+  }, [incidents.length]);
+  return null;
+}
+
 export default function MapView() {
   const { incidents, fetchIncidents, initSocketListeners, createIncident, deployAiPlan } = useIncidentStore();
   const { resources, fetchResources, initSocketListeners: initResSocket } = useResourceStore();
@@ -71,6 +91,7 @@ export default function MapView() {
   const [showHospitals, setShowHospitals] = useState(true);
   const [showEmergencies, setShowEmergencies] = useState(true);
   const [showResources, setShowResources] = useState(true);
+  const [showRadarDrawer, setShowRadarDrawer] = useState(false);
   
   // Quick Report mode on Map Click
   const [isClickToReport, setIsClickToReport] = useState(false);
@@ -135,6 +156,7 @@ export default function MapView() {
           />
 
           <MapClickListener onMapClick={handleMapClick} isAddingReport={isClickToReport} />
+          <MapBoundsAdjuster incidents={incidents} setCenter={setCenter} />
 
           {/* Search Radius Circle Overlay */}
           <Circle
@@ -154,30 +176,30 @@ export default function MapView() {
                 icon={createCustomIcon('incident', inc.priority)}
               >
                 <Popup className="custom-popup">
-                  <div className="p-2 max-w-xs space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-xs text-rose-600 uppercase tracking-wide">{inc.category}</span>
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded text-white ${
+                  <div className="p-1 max-w-xs space-y-2 text-slate-900 dark:text-slate-100">
+                    <div className="flex items-center justify-between gap-2 border-b pb-1.5 border-slate-200 dark:border-slate-800">
+                      <span className="font-extrabold text-xs text-rose-600 dark:text-rose-400 uppercase tracking-wide">{inc.category}</span>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded text-white ${
                         inc.priority === 'CRITICAL' ? 'bg-red-600' : 'bg-amber-500'
                       }`}>
                         {inc.priority}
                       </span>
                     </div>
-                    <h4 className="font-bold text-sm leading-snug">{inc.title}</h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{inc.description}</p>
-                    <div className="text-[11px] text-slate-400 border-t pt-1.5 flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-snug">{inc.title}</h4>
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-800/80 p-2 rounded-lg border border-slate-100 dark:border-slate-800">{inc.description}</p>
+                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 pt-1 flex items-center justify-between">
                       <span>📍 {inc.location?.address}</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{inc.status}</span>
+                      <span className="font-extrabold text-rose-600 dark:text-rose-400 uppercase">{inc.status}</span>
                     </div>
 
                     {inc.aiTriagePlan && (
-                      <div className="mt-2 p-2 bg-rose-50 dark:bg-rose-950/30 rounded-lg text-[11px] border border-rose-100 dark:border-rose-900/40">
-                        <span className="font-bold text-rose-600 block mb-0.5">🤖 AI Response Plan</span>
-                        <p className="text-slate-600 dark:text-slate-300 text-[10px] leading-tight">{inc.aiTriagePlan.summary}</p>
+                      <div className="mt-2 p-2.5 bg-rose-50 dark:bg-rose-950/60 rounded-xl text-[11px] border border-rose-200 dark:border-rose-800 space-y-1">
+                        <span className="font-extrabold text-rose-700 dark:text-rose-300 block">🤖 AI Response Plan</span>
+                        <p className="text-slate-800 dark:text-slate-200 text-[11px] font-medium leading-tight">{inc.aiTriagePlan.summary}</p>
                         {inc.aiTriagePlan.status !== 'DEPLOYED' && (
                           <button
                             onClick={() => deployAiPlan(inc._id || inc.id)}
-                            className="mt-1.5 w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-1 px-2 rounded text-[10px] transition-colors"
+                            className="mt-2 w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-1.5 px-2 rounded-lg text-xs transition-colors shadow-sm"
                           >
                             Deploy Plan
                           </button>
@@ -238,6 +260,18 @@ export default function MapView() {
 
           <div className="flex items-center space-x-2 pointer-events-auto">
             <button 
+              onClick={() => setShowRadarDrawer(!showRadarDrawer)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5 transition-all ${
+                showRadarDrawer 
+                  ? 'bg-brand-600 text-white' 
+                  : 'glass text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-border'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span>Geospatial Radar</span>
+            </button>
+
+            <button 
               onClick={() => setIsClickToReport(!isClickToReport)}
               className={`px-3 py-2 rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5 transition-all ${
                 isClickToReport 
@@ -258,6 +292,82 @@ export default function MapView() {
             </button>
           </div>
         </div>
+
+        {/* Floating Geospatial Radar Drawer Overlay */}
+        {showRadarDrawer && (
+          <div className="absolute top-16 right-4 w-72 glass border border-slate-200 dark:border-dark-border p-4 rounded-2xl shadow-2xl z-[1000] space-y-4">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h4 className="font-bold text-xs flex items-center space-x-1.5 text-slate-800 dark:text-white">
+                <MapPin className="w-4 h-4 text-rose-500" />
+                <span>Geospatial Radar</span>
+              </h4>
+              <button 
+                onClick={() => setShowRadarDrawer(false)}
+                className="text-xs text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold flex items-center justify-between text-slate-700 dark:text-slate-300">
+                  <span>Search Radius</span>
+                  <span className="text-rose-500 font-black">{searchRadiusKm} km</span>
+                </label>
+                <input 
+                  type="range" 
+                  min="5" 
+                  max="50" 
+                  step="5"
+                  value={searchRadiusKm}
+                  onChange={(e) => setSearchRadiusKm(Number(e.target.value))}
+                  className="w-full accent-rose-500 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-2 border-t pt-2">
+                <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider block">Layer Controls</span>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="flex items-center space-x-2 font-medium">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                    <span>Emergencies</span>
+                  </span>
+                  <input 
+                    type="checkbox" 
+                    checked={showEmergencies} 
+                    onChange={(e) => setShowEmergencies(e.target.checked)}
+                    className="rounded text-rose-500 w-4 h-4 cursor-pointer" 
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="flex items-center space-x-2 font-medium">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <span>Hospitals</span>
+                  </span>
+                  <input 
+                    type="checkbox" 
+                    checked={showHospitals} 
+                    onChange={(e) => setShowHospitals(e.target.checked)}
+                    className="rounded text-blue-500 w-4 h-4 cursor-pointer" 
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="flex items-center space-x-2 font-medium">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    <span>Supply Depots</span>
+                  </span>
+                  <input 
+                    type="checkbox" 
+                    checked={showResources} 
+                    onChange={(e) => setShowResources(e.target.checked)}
+                    className="rounded text-amber-500 w-4 h-4 cursor-pointer" 
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Click to Report Quick Drawer Modal */}
         {clickedCoords && isClickToReport && (
