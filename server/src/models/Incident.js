@@ -39,10 +39,10 @@ const incidentSchema = new mongoose.Schema({
     contact: { type: String }
   },
   assignedResources: [{
-    resourceId: String,
-    name: String,
-    type: String,
-    qty: Number
+    resourceId: { type: String },
+    name: { type: String },
+    type: { type: String },
+    qty: { type: Number }
   }],
   aiTriagePlan: {
     status: { type: String, enum: ['PENDING', 'PROPOSED', 'DEPLOYED'], default: 'PROPOSED' },
